@@ -1,0 +1,41 @@
+如果你能够真正的理解autorelease，那么你才是理解了Objective c的内存管理。Autorelease实际上只是把对release的调用延迟了，对于每一个Autorelease，系统只是把该Object放入了当前的Autorelease pool中，当该pool被释放时，该pool中的所有Object会被调用Release。
+ 
+［1］在Iphone项目中，大家会看到一个默认的Autorelease pool，程序开始时创建，程序退出时销毁，按照对Autorelease的理解，岂不是所有autorelease pool里的对象在程序退出时才release， 这样跟内存泄露有什么区别？
+答案是，对于每一个Runloop， 系统会隐式创建一个Autorelease pool，这样所有的release pool会构成一个象CallStack一样的一个栈式结构，在每一个Runloop结束时，当前栈顶的Autorelease pool会被销毁，这样这个pool里的每个Object会被release。
+那什么是一个Runloop呢？ 一个UI事件，Timer call， delegate call， 都会是一个新的Runloop。Autorelease是保证一个method安全的，对于method中的函数调用也适用。例子如下：
+
+NSString* globalObject;
+- (void)applicationDidFinishLaunching:(UIApplication *)application
+{
+globalObject = [[NSString alloc] initWithFormat:@"Test"];
+NSLog(@"Retain count after create: %d", [globalObject retainCount]); // output 1.
+[globalObject retain];
+NSLog(@"Retain count after retain: %d", [globalObject retainCount]); // output 2.
+}
+- (void)applicationWillTerminate:(UIApplication *)application
+{
+NSLog(@"Retain count after Button click runloop finished: %d", [globalObject retainCount]);
+// 输出1. Button click loop finished, it's autorelease pool released, globalObject get released once.
+}
+-(IBAction)onButtonClicked
+{
+[globalObject autorelease];
+NSLog(@"Retain count after autorelease: %d", [globalObject retainCount]);
+// 输出2。 Autorelease被call， globalObject被加如当前的AutoreleaePool。
+}
+
+［2］为什么需要Auto release ？
+2.1)很多C/C++转过来的程序员会说，这个auto release有什么好，象C/C++那样，自己申请，自己释放，完全可控不好么， 这个auto relase 完全不可控，你都不知到它什么时候会被真正的release。我的理解它有一个作用就是可以做到每个函数对自己申请的对象负责，自己申请，自己释放，该函数的调用者不需要关心它内部申请对象的管理。 在下面这个例子中，Func1的调用者不需要再去关心obj的释放。
+
+ClassA *Func1()
+{
+ClassA *obj = [[[ClassA alloc]init]autorelease];
+return obj;
+}
+ 
+ 
+实际上对于 [NSString stringWithFormat:] 这类构造函数返回的对象都是autorelease的。
+2.2) autorelease pool来避免频繁申请/释放内存（就是pool的作用了）。这个应该是相对比较好理解的。
+
+总结：1）一定要注意Autorelease pool的生存周期，理解Runloop，避免在对象被释放后使用。
+2）[NSString stringWithFormat:]这类函数返回的对象是不需要再自己release的，它已经被autorelease了, 如果你想把它当一个全局对象使用，那必须自己再retain， 释放时再release。

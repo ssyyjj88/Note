@@ -1,0 +1,93 @@
+http://my.oschina.net/u/816791/blog/387568
+
+1.NSRunLoop是IOS消息机制的处理模式 
+
+NSRunLoop的主要作用：控制NSRunLoop里面线程的执行和休眠，在有事情做的时候使当前NSRunLoop控制的线程工作，没有事情做让当前NSRunLoop的控制的线程休眠。 
+
+2.NSRunLoop 就是一直在循环检测，从线程start到线程end，检测inputsource(如点击，双击等操作)同步事件，检测timesource同步事件，检测到输入源会执行处理函数，首先会产生通知，corefunction向线程添加runloop observers来监听事件，意在监听事件发生时来做处理。 3.runloopmode是一个集合，包括监听：事件源，定时器，以及需通知的runloop observers 模式包括： 
+
+default模式：几乎包括所有输入源(除NSConnection) NSDefaultRunLoopMode模式  mode模式：处理modal panels 
+
+connection模式：处理NSConnection事件，属于系统内部，用户基本不用 
+
+event tracking模式：如组件拖动输入源 UITrackingRunLoopModes 不处理定时事件  
+
+common modes模式：NSRunLoopCommonModes 这是一组可配置的通用模式。将input sources与该模式关联则同时也将input sources与该组中的其它模式进行了关联。  
+
+每次运行一个run loop，你指定（显式或隐式）run loop的运行模式。当相应的模式传递给run loop时，只有与该模式对应的 input sources才被监控并允许run loop对事件进行处理（与此类似，也只有与该模式对应的observers才会被通知） 
+
+5.NSTimer默认添加到当前NSRunLoop中，也可以手动制定添加到自己新建的NSRunLoop的中 
+
+[NSTimer schduledTimerWithTimeInterval: target:selector:userInfo:repeats]; 此方法默认添加到当前NSRunLoop中 
+
+NSTimer *timer = [NSTimer timerWithTimeInterval: invocation:repeates:]; NSTimer *timer = [[NSTimer alloc] initWithFireDate:...]; 
+
+创建timer  [[NSRunLoop currentRunLoop] addTimer:timer forMode:NSRunLoopCommonModes];  注意 timer的释放    
+
+例： 
+
+1). 在timer与table同时执行情况，当拖动table时，runloop进入UITrackingRunLoopModes模式下，不会处理定时事件，此时timer不能处理，所以此时将timer加入到NSRunLoopCommonModes模式(addTimer forMode) 
+
+2).在滚动一个页面时来松开，此时connection不会收到消息，由于scroll时runloop为UITrackingRunLoopModes模式，不接收输入源，此时要修改connection的mode [scheduleInRunLoop:[NSRunLoop currentRunLoop]forMode:NSRunLoopCommonModes]; 6、子线程中的NSRunLoop需要手动启动，在子线程中使用timer要启动NSRunLoop。 7、关于-(BOOL)runMode:(NSString *)mode beforeDate:(NSDate *)date;方法 指定runloop模式来处理输入源，首个输入源或date结束退出。 
+
+暂停当前处理的流程，转而处理其他输入源，当date设置为[NSDate distantFuture](将来，基本不会到达的时间)，所以除非处理其他输入源结束，否则永不退出处理暂停的当前处理的流程。 8.while(A){ 
+
+ [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate distantFuture]];  } 
+
+当前A为YES时，当前runloop会一直接收处理其他输入源，当前流程不继续处理，出为A为NO，当前流程继续 
+
+9 、perform selector在thread中被序列化执行，这样就缓和了许多在同一个thread中运行多个方法所产生的同步问题。perform selector source在运行完selector后自动从run loop中移除。 当在非main thread中perform selector时，其thread中必须有一个激活的run loop。对于你自己创建的thread而言，只有你的代码显式的运行一个run loop后该perform selector才能得到执行。Run loop在当loop运行时处理所有已排队的perform selector，而不是在一个loop循环时只处理某一个perform selector。  
+
+10.performSelector 关于内存管理的执行原理是这样的执
+
+行 [self performSelector:@selector(method1:) withObject:self.tableLayer afterDelay:3]; 的时候，系统会将tableLayer的引用计数加1，执行完这个方法时，还会将tableLayer的引用计数减1，由于延迟这时tableLayer的引用计数没有减少到0，也就导致了切换场景dealloc方法没有被调用，出现了内存泄露。 利用如下函数： 
+
+[NSObject cancelPreviousPerformRequestsWithTarget:self] 当然你也可以一个一个得这样用： 
+
+[NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(method1:) object:nil] 
+
+
+
+加上了这个以后，顺利地执行了dealloc方法  
+
+在touchBegan里面 
+
+[self performSelector:@selector(longPressMethod:) withObject:nil afterDelay:longPressTime] 然后在end 或cancel里做判断，如果时间不够长按的时间调用： 
+
+[NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(longPressMethod:) object:nil] 
+
+取消began里的方法  
+
+**********************************以下是我在cocoachina中看到的一份总结 转载过来 线程实现的几种方式： 
+
+1. Operation Objects   // NSOperation及相关子类 
+
+2. *****                           // dispatch_async等相关函数 
+
+3. Idle-time notifications  //  NSNotificationQueue,低优先级 3. Asynchronous functions  // 异步函数 4. Timers                      // NSTimer 5. Separate processes  // 没用过  
+
+线程创建的成本： 
+
+kernel data structures  约1KB 
+
+Stack space             512KB(secondary threads)                                     1MB(iOS main thread) Creation time           约90 microseconds  
+
+Run Loop和线程的关系： 
+
+1. 主线程的run loop默认是启动的，用于接收各种输入sources 
+
+2. 对第二线程来说，run loop默认是没有启动的，如果你需要更多的线程交互则可以手动配置和启动，如果线程执行一个长时间已确定的任务则不需要。  
+
+Run Loop什么情况下使用： 
+
+a. 使用ports 或 input sources 和其他线程通信   // 不了解 
+
+b. 在线程中使用timers                                             // 如果不启动run loop，timer的事件是不会响应的  
+
+c. 在Cocoa 应用中使用performSelector...方法   // 应该是performSelector...这种方法会启动一个线程并启动run loop吧 
+
+d. 让线程执行一个周期性的任务                            // 如果不启动run loop， 线程跑完就可能被系统释放了  
+
+注：timer的创建和释放必须在同一线程中。 
+
+[[NSRunLoop currentRunLoop] addTimer:timer forMode:NSRunLoopCommonModes];  此方法会retain timer对象的引用计数 

@@ -1,0 +1,213 @@
+@property (nonatomic,copy) NSString *propertyName;
+self.propertyName 是对属性的访问；
+
+_propertyName 是对局部变量的访问。
+
+其一、@property的声明中，编译器在生成getter,setter方法时是有优先级的，它首先查找当前的类中用户是否已定义属性的getter,setter方法，如果有，则编译器会跳过，不会再生成，使用用户定义的方法。 
+
+也就是说你在使用self.propertyName 时是在调用一个getter方法。
+
+self.propertyName 会让计数器＋1;
+
+其二、_propertyName，是直接调用变量，不通过getter方法。  
+
+_propertyName是类似于self->_propertyName。
+
+用self.propertyName 是更好的选择，因为这样可以兼容懒加载，同时也避免了使用下划线的时候忽视了self这个指针，后者容易在block中造成循环引用。
+
+同时，使用 _是获取不到父类的属性，因为它只是对局部变量的访问。
+
+最后总结：self方法实际上是用了get和set方法间接调用，下划线方法是直接对变量操作。
+
+
+在这里简单说一下_name和name的区别。_name是Person类的成员变量，name是属性。
+
+属性是用self.name，通过getter方法来调用的，可以在类外使用。
+
+而成员变量是通过_name来调用，只能在该类对应的implementation中使用，在类外不能使用。
+
+在类内方法访问成员变量时就应该直接使用成员变量，即带下划线的名字_name，类内方法不推荐使用self.name，因为使用存取器本来就是对外的，在内部使用可能会造成一些不必要的错误，比如：
+
+self.name= [[NSString alloc] init];     //retain count为2，处理不好易导致内存泄露。
+
+
+
+Objective-C里面既有实例方法也类方法。类方法(Class Method) 有时被称为工厂方法(Factory Method)或者方便方法(Convenience method)。工厂方法的称谓明显和一般意义上的工厂方法不同，从本质上来说，类方法可以独立于对象而执行，所以在其他的语言里面类方法有的时候被称为静态方法。
+注意点一：类方法
+1，类方法可以调用类方法。
+2，类方法不可以调用实例方法，但是类方法可以通过创建对象来访问实例方法。
+3，类方法不可以使用实例变量。类方法可以使用self，因为self不是实例变量。
+4，类方法作为消息，可以被发送到类或者对象里面去（实际上，就是可以通过类或者对象调用类方法的意思）。
+注意点二：self的规则
+大家需要记住下面的规则：
+1，实例方法里面的self，是对象的首地址。
+2，类方法里面的self，是Class.
+尽管在同一个类里面的使用self，但是self却有着不同的解读。在类方法里面的self，可以翻译成class self；在实例方法里面的self，应该被翻译成为object self。在类方法里面的self和实例方法里面的self有着本质上的不同，尽管他们的名字都叫self。
+
+类方法创造的对象要不要用release释放？
+答 不需要 这个对象被放到自动释放池中
+
+Object-C中的私有方法和私有成员变量
+
+成员变量默认对内是共有的，对外是私有的。
+
+@interface Controller : NSObject
+{
+
+@private： NSString *something;
+}
++ (void)thisIsAStaticMethod;
+- (void)thisIsAnInstanceMethod;
+@end
+
+@interface Controller (Private)
+- (void)thisIsAPrivateMethod; 
+@end
+下面的代码就是怎样获取私有变量（记得加头文件#import ）：
+NSString *str;
+Mobj *obj = [[Mobj alloc] init];
+object_getInstanceVariable(obj, "mt_", (void *)&str);
+NSLog(@"%@",str);
+[obj release];
+
+／／＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝
+IOS实例方法和类方法的区别
+
+类方法和实例方法 
+1:实例方法是— 类开头是+ 实例方法是用实例对象访问，类方法的对象是类而不是实例，通常创建对象或者工具类。
+在实例方法里，根据继承原理发送消息给self和super其实都是发送给self
+在类方法里面self是其他的类的类方法，在类方法中给self发送消息只能发类方法self是类super也是
+什么时候用类方法，要创建一个实例时候获取一个共享实例，或者获取关于类的一些共有信息
+
+2:
+类方法(class method)和实例方法(instance method)。类方法被限定在类范围内，不能被类的实例调用（即脱离实例运行）。alloc就是一种类方法。实例方法限定在对象实例的范围内（即实例化之前不能运行）。init就是一种实例方法，被alloc方法返回的对象实例调用。
+
+
+
+NSObject * object1 = [[NSObject alloc] init];
+instance method 以减号 "-" 开头 
+class method 以加号 “+” 开头，相当于static方法 
+3:see see 更健康
+Objective-C
+
+1.OC是一门基于C的面向对象语言，是C语言的一个超集，同时具有C语言的特征
+
+
+2.OC对类的定义和实现以及初始化
+
+
+//声明类接口，继承NSObject对象（该对象是OC中所有类的顶级父类，所有类都继承于它）
+
+@interface ClassName ：NSObject
+
+//成员属性和成员函数的声明
+
++（void）function；//类方法，不需要实例化对象就可以调用的方法
+
+- （void）function2 ：（NSString *）arg；//成员方法，必须通过实例化的对象调用
+
+@end
+
+
+//实现类
+
+@imlementation ClassName
+
+//成员属性初始化和方法的定义
+
+@end
+
+
+对象的初始化：ClassName *obj = [[ClassName alloc] init]
+
+OC中以消息机制传递信息，发送alloc消息给类分配内存空间，发送init消息生成对象，指针指向对象本身。
+
+
+3.类方法的调用
+
+[obj function]；
+
+NSString *str = [NSString stringWithString:@"hello"];
+
+[obj function2 : str];
+
+
+4.输出函数
+
+根据不同的输出格式输出不同的值 （%d ：整形 ，%@：对象<发送description消息>，%s：字符串）
+
+NSlog（@“The result is %d”,intNum）;
+
+CF代表Core Foundation (Cocoa)
+
+CFShow发送description给它显示的对象，CFShow打印的信息不会显示时间戳，NSLog会显示，同时CFShow不需要格式字符 串，它只能用于对象
+
+CFShow(obj);
+
+
+5.属性
+
+支持点表示法：myTableViewCell.textLabel.text = @"hello" 等价于 [[myTableViewCell textLabel] setText:@"hello"];
+
+
+使用属性生成器 property
+
+在h文件中声明： @property int year
+
+在m文件中合成生成器：@synthesize year
+
+使用 obj.year = 1999 相当于调用了 [obj setYear:1999];
+
+
+可以自定义取值方法和赋值方法（getter and setter）
+
+-（int）year
+
+{
+
+return year;
+
+}
+
+
+- (void) setYear : (int) newYear
+
+{
+
+//此处添加了一些基本的内存管理方法，保留新的值，释放以前的值
+
+if(newYear != year)
+
+{
+
+[year release];
+
+year = [newYear retain];
+
+}
+
+}
+
+
+也可以绕过oc的命名约定，自己指定getter和setter方法的名称；
+
+@property(getter = isExist,setter = setExist:) BOOL exist;
+
+@synthesize exist;
+
+使用过程中既可以使用新定义的方法名，也可以使用以前的方法（点表示法）
+
+
+属性的特性：readwrite readonly assign retain copy nonatomic
+
+assign：默认行为，使用@property int year就使用了assign行为，就是给实例变量赋了一个值
+
+retain：实现了两个功能，一个是保留了赋值时传递的对象，其次是赋值前释放了以前值，使用retain可以实现上面讨论的内存管理的优点，使用时加上 @property （retain）int year；
+
+copy：发送一条复制的消息给被传递的对象，保留它，并释放任何以前的值；
+
+nonactomic：非原子访问器，加上后可以提升访问速度，但当两个线程同时修改同一个属性时就会出现问题，原子属性可以保证属性在被一个线程使用时不被另一个线程访问，不存在atomic关键字，默认情况下，所有方法都是自动合成的。（类似与java中的线程锁机制synchronized）
+
+readwrite：可读写
+
+readonly：只读
