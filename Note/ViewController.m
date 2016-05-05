@@ -7,12 +7,15 @@
 //
 
 #import "ViewController.h"
+#import "AllFileViewController.h"
 
 #define needCopyFile YES
 
 @interface ViewController ()
-
-@property (weak, nonatomic) IBOutlet UITextView *TextView;
+{
+    int currentIndex;
+}
+@property (weak, nonatomic) IBOutlet RichTextEditor *textView;
 @property (weak, nonatomic) IBOutlet UILabel *titleText;
 @property (strong, nonatomic) NSMutableArray *fileArray;
 @property (strong, nonatomic) UIAlertAction *secureTextAlertAction;
@@ -21,6 +24,7 @@
 - (IBAction)finishBtnDown:(id)sender;
 - (IBAction)allFile:(id)sender;
 - (IBAction)addAction:(id)sender;
+- (IBAction)resign:(id)sender;
 
 @end
 
@@ -34,6 +38,20 @@
 
     NSLog(@"pngPath:%@",textPath);
     
+    
+    currentIndex = 0;
+    NSUserDefaults *userdefault = [NSUserDefaults standardUserDefaults];
+    NSString *lastFile = [userdefault objectForKey:@"file"];
+    
+    if(lastFile)
+    {
+    
+    }
+    else
+    {
+        currentIndex = 0;
+    }
+    
     NSFileManager *fileManager = [NSFileManager defaultManager];
     NSString *fileName;
     self.fileArray = [NSMutableArray array];
@@ -41,23 +59,51 @@
         NSLog(@"fileName:%@",fileName);
         [self.fileArray addObject:fileName];
     }
+    [self.fileArray removeObject:@".DS_Store"];
     
-    [self showText:[self.fileArray lastObject]];
+    //todo
+    for (int i = 0; i < self.fileArray.count; i++) {
+        NSString *file = [self.fileArray objectAtIndex:i];
+        if([file isEqualToString:lastFile])
+        {
+            currentIndex = i;
+        }
+    }
+    
+    if(![fileManager fileExistsAtPath:[NSHomeDirectory() stringByAppendingPathComponent:@"Documents/textData"]])
+    {
+        [fileManager createDirectoryAtPath:[NSHomeDirectory() stringByAppendingPathComponent:@"Documents/textData"] withIntermediateDirectories:YES attributes:nil error:nil];
+    }
+    
+    [self showText:[self.fileArray objectAtIndex:currentIndex]];
     
     if(needCopyFile)
     {
         
     }
+    
+    self.navigationController.navigationBar.hidden = YES;
 }
 
 -(void)showText:(NSString *)title
 {
     self.titleText.text = title;
-    NSString *textPath = [NSString stringWithFormat:@"%@/%@",[NSHomeDirectory() stringByAppendingPathComponent:@"Documents/study/"],title];
-    NSData *data = [NSData dataWithContentsOfFile:textPath];
-    NSStringEncoding encoding = CFStringConvertEncodingToNSStringEncoding(kCFStringEncodingGB_18030_2000);
-    NSString *temp = [[NSString alloc]initWithData:data encoding:encoding];
-    self.TextView.text = temp;
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    if ([fileManager fileExistsAtPath:[NSString stringWithFormat:@"%@/%@", [NSHomeDirectory() stringByAppendingPathComponent:@"Documents/textData"],[[title componentsSeparatedByString:@"."]firstObject]]])
+    {
+        NSString *path = [NSString stringWithFormat:@"%@/%@", [NSHomeDirectory() stringByAppendingPathComponent:@"Documents/textData"],[[title componentsSeparatedByString:@"."]firstObject]];
+        NSData *attrStrData = [NSData dataWithContentsOfFile:path];
+        NSAttributedString *myAttrString = [NSKeyedUnarchiver unarchiveObjectWithData: attrStrData];
+        self.textView.attributedText = myAttrString;
+    }
+    else
+    {
+        NSString *textPath = [NSString stringWithFormat:@"%@/%@",[NSHomeDirectory() stringByAppendingPathComponent:@"Documents/study/"],title];
+        NSData *data = [NSData dataWithContentsOfFile:textPath];
+        NSStringEncoding encoding = CFStringConvertEncodingToNSStringEncoding(kCFStringEncodingGB_18030_2000);
+        NSString *temp = [[NSString alloc]initWithData:data encoding:encoding];
+        self.textView.text = temp;
+    }
 }
 
 - (void)didReceiveMemoryWarning {
@@ -74,7 +120,13 @@
 }
 
 - (IBAction)allFile:(id)sender {
-    
+    AllFileViewController *view = [[AllFileViewController alloc]init];
+    view.dataSource = self.fileArray;
+    view.select = ^(int index){
+         currentIndex = index;
+         [self showText:[self.fileArray objectAtIndex:index]];
+    };
+    [self.navigationController pushViewController:view animated:YES];
 }
 
 - (IBAction)addAction:(id)sender {
@@ -117,16 +169,42 @@
     [self presentViewController:alertController animated:YES completion:nil];
 }
 
+- (IBAction)resign:(id)sender {
+    [self.textView resignFirstResponder];
+}
+
 -(void)nextFile
 {
+    currentIndex += 1;
     if(self.fileArray.count > 0)
     {
-        [self.fileArray removeLastObject];
-        [self showText:[self.fileArray lastObject]];
+        [self showText:[self.fileArray objectAtIndex:currentIndex]];
     }
     else
     {
-        self.TextView.text = @"最后一篇";
+        self.textView.text = @"最后一篇";
     }
+    
+    NSUserDefaults *userdefault = [NSUserDefaults standardUserDefaults];
+    [userdefault setObject:[self.fileArray objectAtIndex:currentIndex] forKey:@"file"];
+    [userdefault synchronize];
 }
+
+
+- (RichTextEditorFeature)featuresEnabledForRichTextEditor:(RichTextEditor *)richTextEditor
+{
+    return RichTextEditorFeatureFontSize | RichTextEditorFeatureFont | RichTextEditorFeatureAll;
+}
+
+- (IBAction)touchBtn:(id)sender {
+    NSLog(@"text:%@",self.textView.attributedText);
+    //  NSData *attrStrData = [self.textView.attributedText dataFromRange:NSMakeRange(0, self.textView.attributedText.length) documentAttributes:NULL error:nil];
+    NSString *pngPath = [NSHomeDirectory() stringByAppendingPathComponent:@"Documents"];
+    NSString *path = [NSString stringWithFormat:@"%@/textData/%@",pngPath,[[self.titleText.text componentsSeparatedByString:@"."]firstObject]];
+    
+    NSMutableData *data = [NSKeyedArchiver archivedDataWithRootObject:self.textView.attributedText];
+    [data writeToFile:path atomically:YES];
+    
+}
+
 @end
